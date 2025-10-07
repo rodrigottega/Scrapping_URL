@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { URLOption, Status } from './types';
 import UrlDropdown from './components/UrlDropdown';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
@@ -34,6 +33,11 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [urlToDelete, setUrlToDelete] = useState<URLOption | null>(null);
+
+  // State for sync
+  const [syncingUrlId, setSyncingUrlId] = useState<number | null>(null);
+  const syncTimeoutRef = useRef<number | null>(null);
+
 
   const handleSelect = (option: URLOption | null) => {
     setSelectedUrl(option);
@@ -73,6 +77,46 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSyncIndividual = (urlToSync: URLOption) => {
+    setSelectedUrl(urlToSync);
+    setSyncingUrlId(urlToSync.id);
+
+    if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+    }
+
+    syncTimeoutRef.current = window.setTimeout(() => {
+        const updatedOptions = urlOptions.map(option => {
+            if (option.id === urlToSync.id) {
+                return {
+                    ...option,
+                    status: Status.Processed,
+                    timestamp: 'Justo ahora',
+                };
+            }
+            return option;
+        });
+
+        setUrlOptions(updatedOptions);
+
+        const updatedSelected = updatedOptions.find(o => o.id === urlToSync.id);
+        if (updatedSelected) {
+            setSelectedUrl(updatedSelected);
+        }
+
+        setSyncingUrlId(null);
+        syncTimeoutRef.current = null;
+    }, 5000); // Simulate 5-second sync time
+  };
+
+  const handleCancelSync = () => {
+    if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+    }
+    setSyncingUrlId(null);
+    syncTimeoutRef.current = null;
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans bg-gray-50">
       <div className="w-full max-w-sm mx-auto">
@@ -84,6 +128,9 @@ const App: React.FC = () => {
           onSelect={handleSelect}
           onDelete={handleDeleteRequest}
           onAdd={handleAddRequest}
+          onSyncIndividual={handleSyncIndividual}
+          onCancelSync={handleCancelSync}
+          syncingUrlId={syncingUrlId}
         />
       </div>
       

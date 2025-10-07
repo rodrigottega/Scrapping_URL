@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { URLOption, Status } from '../types';
 
@@ -40,6 +39,32 @@ const PlusCircleIcon: React.FC<{ className?: string }> = ({ className }) => (
     </svg>
 );
 
+const SearchIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+  </svg>
+);
+
+const SyncIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg
+        className={className}
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={2.5}
+        stroke="currentColor"
+    >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20 9H4m4-4L4 9l4 4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 15h16m-4-4l4 4-4 4" />
+    </svg>
+);
+
+const XMarkIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
 interface StatusBadgeProps {
   status: Status;
 }
@@ -74,11 +99,16 @@ interface UrlDropdownProps {
   onSelect: (option: URLOption | null) => void;
   onDelete: (option: URLOption) => void;
   onAdd: () => void;
+  onSyncIndividual: (option: URLOption) => void;
+  onCancelSync: () => void;
+  syncingUrlId: number | null;
 }
 
-const UrlDropdown: React.FC<UrlDropdownProps> = ({ options, selectedOption, onSelect, onDelete, onAdd }) => {
+const UrlDropdown: React.FC<UrlDropdownProps> = ({ options, selectedOption, onSelect, onDelete, onAdd, onSyncIndividual, onCancelSync, syncingUrlId }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -89,6 +119,12 @@ const UrlDropdown: React.FC<UrlDropdownProps> = ({ options, selectedOption, onSe
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSearchTerm(''); // Clear search on open
+    }
+  }, [isOpen]);
 
   const handleSelectOption = (option: URLOption) => {
     onSelect(option);
@@ -113,34 +149,87 @@ const UrlDropdown: React.FC<UrlDropdownProps> = ({ options, selectedOption, onSe
     setIsOpen(false);
   }
 
+  const handleSyncIndividualClick = (e: React.MouseEvent, option: URLOption) => {
+    e.stopPropagation();
+    onSyncIndividual(option);
+    setIsOpen(false);
+  };
+
+  const filteredOptions = options.filter(option =>
+    option.url.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const isSyncing = syncingUrlId !== null;
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white border border-gray-300 rounded-lg shadow-sm p-3 text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+        onClick={() => !isSyncing && setIsOpen(!isOpen)}
+        className={`w-full bg-white border border-gray-300 rounded-lg shadow-sm p-3 text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${isSyncing ? 'opacity-75 cursor-not-allowed' : ''}`}
       >
         <div className="flex justify-between items-center">
-          {selectedOption ? (
-            <div className="flex flex-col">
-              <span className="text-base text-gray-900 font-medium">{selectedOption.url}</span>
-              <div className="flex items-center space-x-2 mt-1.5">
-                <StatusBadge status={selectedOption.status} />
-                <span className="text-sm text-gray-500">{selectedOption.timestamp}</span>
-              </div>
-            </div>
-          ) : (
-             <div className="flex flex-col">
-                <span className="text-base text-gray-500 font-medium">Ninguna URL seleccionada</span>
-             </div>
-          )}
-          <ChevronUpDownIcon className="w-5 h-5 text-gray-400" />
+            {isSyncing && selectedOption?.id === syncingUrlId ? (
+                <div className="flex justify-between items-center w-full">
+                    <div className="flex flex-col flex-grow mr-4 overflow-hidden">
+                        <span className="text-base text-gray-900 font-medium truncate">{selectedOption.url}</span>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                            <div className="bg-blue-600 h-1.5 rounded-full animate-progress"></div>
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1">Sincronizando...</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onCancelSync();
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 cursor-pointer"
+                        aria-label="Cancelar sincronización"
+                    >
+                        <XMarkIcon className="w-5 h-5" />
+                    </button>
+                </div>
+            ) : (
+                <>
+                    {selectedOption ? (
+                        <div className="flex flex-col">
+                        <span className="text-base text-gray-900 font-medium">{selectedOption.url}</span>
+                        <div className="flex items-center space-x-2 mt-1.5">
+                            <StatusBadge status={selectedOption.status} />
+                            <span className="text-sm text-gray-500">{selectedOption.timestamp}</span>
+                        </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col">
+                            <span className="text-base text-gray-500 font-medium">Ninguna URL seleccionada</span>
+                        </div>
+                    )}
+                    <ChevronUpDownIcon className="w-5 h-5 text-gray-400" />
+                </>
+            )}
         </div>
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg border border-gray-200 rounded-md py-1">
-            <ul className="max-h-60 overflow-auto">
+        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg border border-gray-200 rounded-md">
+            <div className="p-2 border-b border-gray-200">
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <SearchIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Buscar URL..."
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            </div>
+            <ul className="max-h-60 overflow-auto py-1">
                 <li>
                     <button
                         onClick={handleClearSelection}
@@ -157,35 +246,77 @@ const UrlDropdown: React.FC<UrlDropdownProps> = ({ options, selectedOption, onSe
                     </button>
                 </li>
                 <li className="border-t border-gray-100 my-1"></li>
-                {options.map((option) => (
-                    <li key={option.id}>
-                        <button
-                            onClick={() => handleSelectOption(option)}
-                            className={`w-full text-left px-4 py-3 text-sm flex justify-between items-center group transition-colors ${selectedOption?.id === option.id ? 'bg-indigo-50' : 'hover:bg-gray-100'}`}
-                        >
-                            <div className="flex items-center space-x-3">
-                                <div className="w-5">
-                                    {selectedOption?.id === option.id && (
-                                        <CheckIcon className="w-5 h-5 text-indigo-600" />
+                {filteredOptions.length > 0 ? (
+                    filteredOptions.map((option) => (
+                        <li key={option.id}>
+                            <button
+                                onClick={() => handleSelectOption(option)}
+                                className={`w-full text-left px-4 py-3 text-sm flex justify-between items-center group transition-colors ${selectedOption?.id === option.id ? 'bg-indigo-50' : 'hover:bg-gray-100'}`}
+                            >
+                                <div className="flex items-center space-x-3 truncate">
+                                    <div className="w-5 flex-shrink-0">
+                                        {selectedOption?.id === option.id && (
+                                            <CheckIcon className="w-5 h-5 text-indigo-600" />
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col truncate">
+                                        <span className={`font-medium truncate ${selectedOption?.id === option.id ? 'text-indigo-900' : 'text-gray-900'}`}>{option.url}</span>
+                                        <span className={`text-xs ${selectedOption?.id === option.id ? 'text-indigo-700' : 'text-gray-500'}`}>{option.status} - {option.timestamp}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center flex-shrink-0 ml-4" style={{minWidth: '60px'}}>
+                                    {syncingUrlId === option.id ? (
+                                        <div className="w-full flex flex-col items-center justify-center">
+                                            <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700">
+                                                <div className="bg-blue-600 h-1.5 rounded-full animate-progress"></div>
+                                            </div>
+                                            <span className="text-xs text-gray-500 mt-1">Sincronizando...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => handleSyncIndividualClick(e, option)}
+                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded-full transition-colors peer"
+                                                    aria-label={`Sincronizar ${option.url}`}
+                                                >
+                                                    <SyncIcon className="w-5 h-5" />
+                                                </button>
+                                                <div
+                                                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-xs px-2 py-1 rounded-md opacity-0 peer-hover:opacity-100 transition-opacity pointer-events-none"
+                                                    role="tooltip"
+                                                >
+                                                    Sincronizar
+                                                </div>
+                                            </div>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => handleDeleteOption(e, option)}
+                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors peer"
+                                                    aria-label={`Eliminar ${option.url}`}
+                                                >
+                                                    <TrashIcon className="w-5 h-5" />
+                                                </button>
+                                                <div
+                                                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-xs px-2 py-1 rounded-md opacity-0 peer-hover:opacity-100 transition-opacity pointer-events-none"
+                                                    role="tooltip"
+                                                >
+                                                    Borrar
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className={`font-medium ${selectedOption?.id === option.id ? 'text-indigo-900' : 'text-gray-900'}`}>{option.url}</span>
-                                    <span className={`text-xs ${selectedOption?.id === option.id ? 'text-indigo-700' : 'text-gray-500'}`}>{option.status} - {option.timestamp}</span>
-                                </div>
-                            </div>
-                            <button 
-                                onClick={(e) => handleDeleteOption(e, option)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                aria-label={`Eliminar ${option.url}`}
-                            >
-                            <TrashIcon className="w-4 h-4" />
                             </button>
-                        </button>
+                        </li>
+                    ))
+                ) : (
+                    <li className="px-4 py-3 text-sm text-gray-500 text-center italic">
+                        No se encontraron resultados.
                     </li>
-                ))}
+                )}
             </ul>
-            <div className="border-t border-gray-200 mt-1 pt-1">
+            <div className="border-t border-gray-200">
                 <button
                     onClick={handleAddOption}
                     className="w-full text-left px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 flex items-center space-x-2"
