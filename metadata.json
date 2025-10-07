@@ -1,0 +1,5 @@
+{
+  "name": "URL Selector Dropdown",
+  "description": "A custom dropdown component for selecting, adding, and managing URLs with status indicators, built with React and Tailwind CSS.",
+  "requestFramePermissions": []
+}
